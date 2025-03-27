@@ -1,31 +1,45 @@
 import streamlit as st
+import numpy as np
+import joblib
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
 
-def load_segmented_data():
-    return pd.read_csv("processed_rfm.csv", index_col=0)
+# Load trained model & scaler
+@st.cache_resource
+def load_model():
+    model = joblib.load("rfm_model.pkl")
+    scaler = joblib.load("scaler.pkl")
+    feature_names = joblib.load("feature_names.pkl")  # Load feature names
+    return model, scaler, feature_names
 
-def visualize_clusters(df):
-    st.subheader("Customer Segments Visualization")
-    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
-    
-    sns.boxplot(x='Cluster', y='Recency', data=df, ax=axes[0])
-    axes[0].set_title("Recency by Cluster")
-    
-    sns.boxplot(x='Cluster', y='Frequency', data=df, ax=axes[1])
-    axes[1].set_title("Frequency by Cluster")
-    
-    sns.boxplot(x='Cluster', y='Monetary', data=df, ax=axes[2])
-    axes[2].set_title("Monetary by Cluster")
-    
-    st.pyplot(fig)
+# Function for customer segment prediction
+def predict_customer_segment(model, scaler, feature_names):
+    st.title("🎯 Predict Customer Segment")
 
+    # Input fields
+    recency = st.number_input("📅 Recency (Days Since Last Purchase):", min_value=0, max_value=365, value=30)
+    frequency = st.number_input("🔄 Frequency (Number of Purchases):", min_value=0, max_value=100, value=5)
+    monetary = st.number_input("💰 Monetary Value (Total Spend):", min_value=0, max_value=10000, value=500)
+
+    if st.button("🚀 Predict Segment"):
+        # Create DataFrame with correct feature names
+        user_input = pd.DataFrame([[recency, frequency, monetary]], columns=feature_names)
+        
+        # Scale input before prediction
+        user_input_scaled = scaler.transform(user_input)
+
+        # Predict cluster
+        prediction = model.predict(user_input_scaled)
+
+        # Mapping cluster numbers to meaningful names
+        segment_names = {0: "VIP Customers", 1: "Regular Customers", 2: "At-Risk Customers", 3: "Lost Customers"}
+        segment = segment_names.get(prediction[0], "Unknown Segment")
+
+        st.success(f"🟢 Predicted Customer Segment: **{segment}**")
+
+# Main function
 def main():
-    st.title("Customer Segmentation Dashboard")
-    df = load_segmented_data()
-    st.dataframe(df.head())
-    visualize_clusters(df)
+    model, scaler, feature_names = load_model()
+    predict_customer_segment(model, scaler, feature_names)
 
 if __name__ == "__main__":
     main()
